@@ -18,9 +18,10 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { fetchPlayerRatings } from "../lib/dreamTeamApi";
 import { db } from "../firebase";
 import { onValue, ref, set } from "firebase/database";
+import DreamTeamMatchScreen from "./DreamTeamMatchScreen";
 
 const MAX_PLAYERS = 15; // batas skuad (maksimal pemain yang bisa dipilih)
-const TOTAL_BUDGET = 100; // contoh budget total
+const TOTAL_BUDGET = 150; // total budget dalam juta (m)
 
 const DEFAULT_SLOTS = [
   // GK
@@ -48,9 +49,18 @@ const DEFAULT_SLOTS = [
 const getPlayerPrice = (rating) => {
   const r = Number(rating);
   if (!Number.isFinite(r)) return 4;
-  const clamped = Math.max(0, Math.min(100, r));
-  const price = 4 + (clamped / 100) * 7; // 4.0 - 11.0
-  return Number(price.toFixed(1));
+
+  // Skala rating kita kira-kira 0-100 (dari API-FOOTBALL).
+  // Biar harga lebih fluktuatif dan mirip FPL:
+  // - rating 60  -> ~4.0m
+  // - rating 70  -> ~6.8m
+  // - rating 80  -> ~9.5m
+  // - rating 90  -> ~12.3m
+  // - rating 100 -> ~15.0m
+  const clamped = Math.max(60, Math.min(100, r));
+  const norm = (clamped - 60) / 40; // 0 - 1
+  const basePrice = 4 + norm * 11; // 4 - 15
+  return Number(basePrice.toFixed(1));
 };
 
 const withPrice = (player) => {
@@ -186,6 +196,7 @@ export default function DreamTeamScreen({ userId }) {
   const [saveStatus, setSaveStatus] = useState("");
   const [saving, setSaving] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [mode, setMode] = useState("builder"); // "builder" | "match"
 
   useEffect(() => {
     let cancelled = false;
@@ -425,6 +436,23 @@ export default function DreamTeamScreen({ userId }) {
     setLineup((prev) => prev.filter((slot) => slot.id !== id));
   };
 
+  const handlePlayVsBot = () => {
+    if (!selectedPlayers.length) {
+      setSearchError("Pilih pemain dulu sebelum melawan bot.");
+      return;
+    }
+    setMode("match");
+  };
+
+  if (mode === "match") {
+    return (
+      <DreamTeamMatchScreen
+        userTeam={selectedPlayers}
+        onBack={() => setMode("builder")}
+      />
+    );
+  }
+
   return (
     <View style={styles.flex1}>
       <View style={styles.container}>
@@ -557,26 +585,41 @@ export default function DreamTeamScreen({ userId }) {
                 </View>
               </View>
 
-              <TouchableOpacity
-                style={[
-                  styles.saveButton,
-                  (!userId || !selectedPlayers.length || saving) &&
-                    styles.saveButtonDisabled,
-                ]}
-                activeOpacity={0.85}
-                onPress={handleSaveToFirebase}
-                disabled={!userId || !selectedPlayers.length || saving}
-              >
-                <MaterialIcons
-                  name="save"
-                  size={16}
-                  color="#111827"
-                  style={{ marginRight: 4 }}
-                />
-                <Text style={styles.saveButtonText}>
-                  {saving ? "Menyimpan..." : "Simpan"}
-                </Text>
-              </TouchableOpacity>
+              <View style={styles.summaryActions}>
+                <TouchableOpacity
+                  style={styles.playButton}
+                  activeOpacity={0.85}
+                  onPress={handlePlayVsBot}
+                >
+                  <MaterialIcons
+                    name="sports-soccer"
+                    size={16}
+                    color="#e5e7eb"
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={styles.playButtonText}>Play vs Bot</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.saveButton,
+                    (!userId || !selectedPlayers.length || saving) &&
+                      styles.saveButtonDisabled,
+                  ]}
+                  activeOpacity={0.85}
+                  onPress={handleSaveToFirebase}
+                  disabled={!userId || !selectedPlayers.length || saving}
+                >
+                  <MaterialIcons
+                    name="save"
+                    size={16}
+                    color="#111827"
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={styles.saveButtonText}>
+                    {saving ? "Menyimpan..." : "Simpan"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {!!saveStatus && (
@@ -720,6 +763,10 @@ const styles = StyleSheet.create({
   summaryBlock: {
     marginRight: 16,
   },
+  summaryActions: {
+    flexDirection: "column",
+    alignItems: "flex-end",
+  },
   summaryLabel: {
     fontSize: 10,
     textTransform: "uppercase",
@@ -767,6 +814,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: "#111827",
+  },
+  playButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#4b5563",
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 4,
+  },
+  playButtonText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#e5e7eb",
   },
   pitch: {
     marginTop: 12,
