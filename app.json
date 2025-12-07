@@ -4,9 +4,12 @@
     "slug": "scoreboard",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/checkvar.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
+    "updates": {
+      "enabled": false
+    },
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -17,10 +20,11 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/checkvar.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.lupaakuom.scoreboard"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -30,6 +34,9 @@
         "projectId": "e60ab7c3-7ce6-4eaf-8f17-2c7fe3f36fb4"
       }
     },
-    "owner": "lupaakuom"
+    "owner": "lupaakuom",
+    "plugins": [
+      "expo-font"
+    ]
   }
 }

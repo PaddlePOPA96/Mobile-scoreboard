@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from "firebase/app";
 import { getDatabase } from "firebase/database";
-import { firebaseConfig } from "shared/firebaseConfig";
+import { firebaseConfig } from "./shared/firebaseConfig";
 
 // Expo / React Native Firebase app, shared config with Next.js.
 

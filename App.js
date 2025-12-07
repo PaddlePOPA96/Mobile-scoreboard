@@ -7,9 +7,12 @@ import {
   TextInput,
   ActivityIndicator,
   TouchableOpacity,
+  Image,
+  Animated,
 } from "react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useScoreboardNative } from "./hooks/useScoreboardNative";
 import {
   auth,
@@ -20,17 +23,26 @@ import {
 import OverlayLayoutMobile from "./components/OverlayLayoutMobile";
 import PremierLeagueScreen from "./components/PremierLeagueScreen";
 import ChampionsLeagueScreen from "./components/ChampionsLeagueScreen";
+import PrimaryButton from "./components/PrimaryButton";
+import SecondaryButton from "./components/SecondaryButton";
+import NavItem from "./components/NavItem";
+import DreamTeamScreen from "./components/DreamTeamScreen";
+
+const CREDENTIALS_KEY = "scoreboard_mobile_credentials";
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [authLoading, setAuthLoading] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
    const [profileMenuOpen, setProfileMenuOpen] = useState(false);
    const [manualMinutes, setManualMinutes] = useState("");
   const [status, setStatus] = useState({ type: "", message: "" });
-  const [activeTab, setActiveTab] = useState("scoreboard"); // "scoreboard" | "premier-league" | "ucl-table"
+  const [activeTab, setActiveTab] = useState("scoreboard"); // "scoreboard" | "premier-league" | "ucl-table" | "dream-team"
+
+  const logoScale = useRef(new Animated.Value(0.9)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (current) => {
@@ -40,11 +52,59 @@ export default function App() {
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(CREDENTIALS_KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        if (!saved?.email || !saved?.password) return;
+        await signInWithEmailAndPassword(auth, saved.email, saved.password);
+      } catch {
+        // ignore auto-login errors
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!authLoading) return;
+    logoOpacity.setValue(0);
+    Animated.timing(logoOpacity, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(logoScale, {
+          toValue: 1.05,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoScale, {
+          toValue: 0.95,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [authLoading, logoOpacity, logoScale]);
+
   const handleLogin = async () => {
     setStatus({ type: "", message: "" });
     setLoginLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
+      const trimmedEmail = email.trim();
+      await signInWithEmailAndPassword(auth, trimmedEmail, password);
+      try {
+        await AsyncStorage.setItem(
+          CREDENTIALS_KEY,
+          JSON.stringify({ email: trimmedEmail, password }),
+        );
+      } catch {
+        // ignore persistence errors
+      }
       setStatus({ type: "success", message: "Berhasil login." });
       setPassword("");
     } catch (error) {
@@ -60,6 +120,11 @@ export default function App() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      try {
+        await AsyncStorage.removeItem(CREDENTIALS_KEY);
+      } catch {
+        // ignore persistence errors
+      }
     } catch {
       // ignore
     }
@@ -109,6 +174,28 @@ export default function App() {
     if (!user) return;
     updateMatch({ period });
   };
+
+  if (authLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Animated.Image
+          source={require("./assets/checkvar.png")}
+          style={[
+            styles.loadingLogo,
+            {
+              opacity: logoOpacity,
+              transform: [{ scale: logoScale }],
+            },
+          ]}
+          resizeMode="contain"
+        />
+        <ActivityIndicator
+          color="#fbbf24"
+          style={{ marginTop: 16 }}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -218,42 +305,30 @@ export default function App() {
                 <Text style={styles.teamName}>Home</Text>
                 <Text style={styles.score}>{data.homeScore}</Text>
                 <View style={styles.scoreButtonsRow}>
-                  <TouchableOpacity
-                    style={[styles.largeButton, styles.secondaryButton]}
+                  <SecondaryButton
+                    title="-1"
                     onPress={() => handleScoreChange("home", -1)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.buttonText}>-1</Text>
-                  </TouchableOpacity>
+                  />
                   <View style={{ width: 8 }} />
-                  <TouchableOpacity
-                    style={[styles.largeButton, styles.primaryButton]}
+                  <PrimaryButton
+                    title="+1"
                     onPress={() => triggerGoal("home")}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.buttonText}>+1</Text>
-                  </TouchableOpacity>
+                  />
                 </View>
               </View>
               <View style={styles.teamBox}>
                 <Text style={styles.teamName}>Away</Text>
                 <Text style={styles.score}>{data.awayScore}</Text>
                 <View style={styles.scoreButtonsRow}>
-                  <TouchableOpacity
-                    style={[styles.largeButton, styles.secondaryButton]}
+                  <SecondaryButton
+                    title="-1"
                     onPress={() => handleScoreChange("away", -1)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.buttonText}>-1</Text>
-                  </TouchableOpacity>
+                  />
                   <View style={{ width: 8 }} />
-                  <TouchableOpacity
-                    style={[styles.largeButton, styles.primaryButton]}
+                  <PrimaryButton
+                    title="+1"
                     onPress={() => triggerGoal("away")}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.buttonText}>+1</Text>
-                  </TouchableOpacity>
+                  />
                 </View>
               </View>
             </View>
@@ -276,13 +351,10 @@ export default function App() {
               </View>
               <View style={{ width: 8 }} />
               <View style={{ justifyContent: "flex-end" }}>
-                <TouchableOpacity
-                  style={[styles.largeButton, styles.primaryButton]}
+                <PrimaryButton
+                  title="Set Time"
                   onPress={handleSetTime}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.buttonText}>Set Time</Text>
-                </TouchableOpacity>
+                />
               </View>
             </View>
 
@@ -347,23 +419,17 @@ export default function App() {
             </View>
 
             <View style={styles.controlsRow}>
-              <TouchableOpacity
-                style={[styles.largeButton, styles.primaryButton, { flex: 1 }]}
+              <PrimaryButton
+                title={data.timer?.isRunning ? "Pause" : "Start"}
                 onPress={toggleTimer}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.buttonText}>
-                  {data.timer?.isRunning ? "Pause" : "Start"}
-                </Text>
-              </TouchableOpacity>
+                style={{ flex: 1 }}
+              />
               <View style={{ width: 12 }} />
-              <TouchableOpacity
-                style={[styles.largeButton, styles.secondaryButton, { flex: 1 }]}
+              <SecondaryButton
+                title="Reset"
                 onPress={resetTimer}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.buttonText}>Reset</Text>
-              </TouchableOpacity>
+                style={{ flex: 1 }}
+              />
             </View>
           </>
         )}
@@ -374,6 +440,10 @@ export default function App() {
 
         {user && activeTab === "ucl-table" && (
           <ChampionsLeagueScreen />
+        )}
+
+        {user && activeTab === "dream-team" && (
+          <DreamTeamScreen userId={user?.uid} />
         )}
       </View>
 
@@ -397,29 +467,16 @@ export default function App() {
           active={activeTab === "ucl-table"}
           onPress={() => setActiveTab("ucl-table")}
         />
+        <NavItem
+          icon="groups"
+          label="Dream Team"
+          active={activeTab === "dream-team"}
+          onPress={() => setActiveTab("dream-team")}
+        />
       </View>
 
       <StatusBar style="light" />
     </View>
-  );
-}
-
-function NavItem({ icon, label, active, onPress }) {
-  return (
-    <TouchableOpacity
-      style={styles.navItem}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <MaterialIcons
-        name={icon}
-        size={22}
-        color={active ? "#fbbf24" : "#9ca3af"}
-      />
-      <Text style={[styles.navLabel, active && styles.navLabelActive]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
   );
 }
 
@@ -492,9 +549,13 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: "#050816",
+    backgroundColor: "#16a34a",
     alignItems: "center",
     justifyContent: "center",
+  },
+  loadingLogo: {
+    width: 160,
+    height: 160,
   },
   title: {
     fontSize: 24,
@@ -592,29 +653,6 @@ const styles = StyleSheet.create({
   },
   scoreButtonsRow: {
     flexDirection: "row",
-  },
-  largeButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 999,
-    minWidth: 88,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#1f2937",
-  },
-  primaryButton: {
-    backgroundColor: "#fbbf24",
-  },
-  secondaryButton: {
-    backgroundColor: "#374151",
-  },
-  dangerButton: {
-    backgroundColor: "#b91c1c",
-  },
-  buttonText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#0b1120",
   },
   timer: {
     color: "#e5e7eb",

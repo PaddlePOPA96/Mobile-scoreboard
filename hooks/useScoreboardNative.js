@@ -9,7 +9,7 @@ import {
   createToggleTimerUpdate,
   createResetTimerUpdate,
   createToggleOverlayUpdate,
-} from "shared/scoreboardLogic";
+} from "../shared/scoreboardLogic";
 
 // Versi React Native dari useScoreboard.
 // Menggunakan logic yang sama dengan web melalui shared/scoreboardLogic.
