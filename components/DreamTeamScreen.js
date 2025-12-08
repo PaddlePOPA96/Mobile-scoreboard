@@ -24,39 +24,32 @@ const MAX_PLAYERS = 15; // batas skuad (maksimal pemain yang bisa dipilih)
 const TOTAL_BUDGET = 150; // total budget dalam juta (m)
 
 const DEFAULT_SLOTS = [
-  // GK
-  { x: 0.5, y: 0.1 },
+  // GK (Bottom)
+  { x: 0.5, y: 0.85 },
   // DEF (4)
-  { x: 0.15, y: 0.3 },
-  { x: 0.38, y: 0.32 },
-  { x: 0.62, y: 0.32 },
-  { x: 0.85, y: 0.3 },
+  { x: 0.15, y: 0.65 },
+  { x: 0.38, y: 0.62 },
+  { x: 0.62, y: 0.62 },
+  { x: 0.85, y: 0.65 },
   // MID (3)
-  { x: 0.25, y: 0.55 },
-  { x: 0.5, y: 0.58 },
-  { x: 0.75, y: 0.55 },
-  // FWD (3)
-  { x: 0.2, y: 0.8 },
-  { x: 0.5, y: 0.83 },
-  { x: 0.8, y: 0.8 },
-  // Bench / ekstra (4)
-  { x: 0.12, y: 0.93 },
-  { x: 0.36, y: 0.93 },
-  { x: 0.64, y: 0.93 },
-  { x: 0.88, y: 0.93 },
+  { x: 0.25, y: 0.40 },
+  { x: 0.5, y: 0.37 },
+  { x: 0.75, y: 0.40 },
+  // FWD (3) (Top)
+  { x: 0.2, y: 0.15 },
+  { x: 0.5, y: 0.12 },
+  { x: 0.8, y: 0.15 },
+  // Bench / ekstra (4) (Very Bottom)
+  { x: 0.12, y: 0.95 },
+  { x: 0.36, y: 0.95 },
+  { x: 0.64, y: 0.95 },
+  { x: 0.88, y: 0.95 },
 ];
 
 const getPlayerPrice = (rating) => {
   const r = Number(rating);
   if (!Number.isFinite(r)) return 4;
 
-  // Skala rating kita kira-kira 0-100 (dari API-FOOTBALL).
-  // Biar harga lebih fluktuatif dan mirip FPL:
-  // - rating 60  -> ~4.0m
-  // - rating 70  -> ~6.8m
-  // - rating 80  -> ~9.5m
-  // - rating 90  -> ~12.3m
-  // - rating 100 -> ~15.0m
   const clamped = Math.max(60, Math.min(100, r));
   const norm = (clamped - 60) / 40; // 0 - 1
   const basePrice = 4 + norm * 11; // 4 - 15
@@ -77,8 +70,6 @@ function DraggablePlayer({ player, pitchSize, onMove, onLongRemove }) {
   const longPressRef = useRef(null);
   const playerRef = useRef(player);
 
-  // Simpan selalu nilai player terbaru di ref,
-  // supaya onPanResponderGrant bisa pakai posisi terkini.
   useEffect(() => {
     playerRef.current = player;
   }, [player]);
@@ -184,7 +175,7 @@ function DraggablePlayer({ player, pitchSize, onMove, onLongRemove }) {
 
 export default function DreamTeamScreen({ userId }) {
   const [players, setPlayers] = useState([]);
-  const [lineup, setLineup] = useState([]); // { id, x, y }
+  const [lineup, setLineup] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
@@ -196,7 +187,7 @@ export default function DreamTeamScreen({ userId }) {
   const [saveStatus, setSaveStatus] = useState("");
   const [saving, setSaving] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
-  const [mode, setMode] = useState("builder"); // "builder" | "match"
+  const [mode, setMode] = useState("builder");
 
   useEffect(() => {
     let cancelled = false;
@@ -208,7 +199,6 @@ export default function DreamTeamScreen({ userId }) {
         if (cancelled) return;
         const baseList = Array.isArray(data) ? data.map(withPrice) : [];
         setPlayers((prev) => {
-          // Gabungkan data dari API (basis) dengan data yang sudah ada (mis. dari Firebase)
           const map = new Map();
           baseList.forEach((p) => {
             if (p && p.id) {
@@ -226,7 +216,7 @@ export default function DreamTeamScreen({ userId }) {
         if (!cancelled) {
           setError(
             err?.message ||
-              "Gagal memuat data pemain. Cek koneksi atau API key.",
+            "Gagal memuat data pemain. Cek koneksi atau API key.",
           );
         }
       } finally {
@@ -300,13 +290,12 @@ export default function DreamTeamScreen({ userId }) {
     selectedPlayers.length === 0
       ? 0
       : selectedPlayers.reduce((sum, p) => sum + (p.rating || 0), 0) /
-        selectedPlayers.length;
+      selectedPlayers.length;
 
   const totalSpent = selectedPlayers.reduce(
     (sum, p) => sum + (typeof p.price === "number" ? p.price : 0),
     0,
   );
-  const remainingBudget = TOTAL_BUDGET - totalSpent;
 
   const handleSaveToFirebase = async () => {
     if (!userId || !selectedPlayers.length || saving) return;
@@ -321,7 +310,6 @@ export default function DreamTeamScreen({ userId }) {
       await set(ref(db, `dream_team/${userId}`), payload);
       setSaveStatus("Tersimpan");
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.warn("[DreamTeam] Gagal menyimpan ke Firebase:", e);
       const msg =
         e?.code ||
@@ -385,8 +373,6 @@ export default function DreamTeamScreen({ userId }) {
 
   const handleChooseFromResults = (candidate) => {
     const pricedCandidate = withPrice(candidate);
-
-    // Hitung batas skuad & budget sebelum menambah pemain baru.
     const alreadyInLineup = lineup.some((s) => s.id === pricedCandidate.id);
     const currentTotalPrice = selectedPlayers.reduce(
       (sum, p) => sum + (typeof p.price === "number" ? p.price : 0),
@@ -395,16 +381,15 @@ export default function DreamTeamScreen({ userId }) {
     const newTotalPrice = alreadyInLineup
       ? currentTotalPrice
       : currentTotalPrice +
-        (typeof pricedCandidate.price === "number"
-          ? pricedCandidate.price
-          : 0);
+      (typeof pricedCandidate.price === "number"
+        ? pricedCandidate.price
+        : 0);
 
     if (!alreadyInLineup && lineup.length >= MAX_PLAYERS) {
       setSearchError(`Skuad penuh (maks ${MAX_PLAYERS} pemain).`);
       setShowResultsModal(false);
       return;
     }
-
     if (!alreadyInLineup && newTotalPrice > TOTAL_BUDGET) {
       setSearchError("Budget tidak cukup untuk pemain ini.");
       return;
@@ -458,7 +443,7 @@ export default function DreamTeamScreen({ userId }) {
       <View style={styles.container}>
         <Text style={styles.title}>Dream Team Builder</Text>
         <Text style={styles.subtitle}>
-          Pilih sampai 15 pemain dengan batas budget, tarik untuk atur posisi, hold untuk hapus.
+          Pilih sampai 15 pemain. Drag utk atur posisi.
         </Text>
 
         <View
@@ -471,38 +456,39 @@ export default function DreamTeamScreen({ userId }) {
           }}
         >
           <View style={styles.pitchLines} pointerEvents="none">
-            {/* Pola rumput */}
             <View style={styles.grassPattern} />
-
-            {/* Garis luar */}
             <View style={styles.outerBorder} />
 
-            {/* Area penalti atas */}
-            <View
-              style={[styles.penaltyBoxOuter, styles.penaltyBoxOuterTop]}
-            />
-            <View
-              style={[styles.penaltyBoxInner, styles.penaltyBoxInnerTop]}
-            />
-            <View style={[styles.penaltySpot, styles.penaltySpotTop]} />
+            {/* TOP AREA (Opponent / Attack Target) - MINIMAL MARKINGS */}
+            <View style={[styles.penaltyBoxOuter, styles.penaltyBoxOuterTop]} />
+            <View style={[styles.penaltyBoxInner, styles.penaltyBoxInnerTop]} />
             <View style={[styles.penaltyArc, styles.penaltyArcTop]} />
-            <View style={[styles.goalArea, styles.goalTop]} />
 
-            {/* Garis tengah */}
+            {/* Center */}
             <View style={styles.halfLine} />
             <View style={styles.centerCircle} />
             <View style={styles.centerSpot} />
 
-            {/* Area penalti bawah */}
-            <View
-              style={[styles.penaltyBoxOuter, styles.penaltyBoxOuterBottom]}
-            />
-            <View
-              style={[styles.penaltyBoxInner, styles.penaltyBoxInnerBottom]}
-            />
+            {/* BOTTOM AREA (My Team / Defend) - HIGHLIGHTED */}
+            <View style={[styles.penaltyBoxOuter, styles.penaltyBoxOuterBottom]} />
+            <View style={[styles.penaltyBoxInner, styles.penaltyBoxInnerBottom]} />
             <View style={[styles.penaltySpot, styles.penaltySpotBottom]} />
             <View style={[styles.penaltyArc, styles.penaltyArcBottom]} />
-            <View style={[styles.goalArea, styles.goalBottom]} />
+
+            {/* Explicit My Goal Net Area */}
+            <View style={[styles.goalArea, styles.goalBottom]}>
+              <View style={styles.goalNetPattern} />
+            </View>
+
+            {/* LABELS */}
+            <View style={styles.myGoalLabelContainer}>
+              <Text style={styles.myGoalLabel}>MY GOAL (GK HERE)</Text>
+            </View>
+
+            <View style={styles.probedLabelContainer}>
+              <Text style={styles.probedLabel}>ATTACK UPWARDS</Text>
+              <MaterialIcons name="arrow-upward" size={20} color="rgba(255,255,255,0.3)" />
+            </View>
 
             {/* Corner arcs */}
             <View style={[styles.cornerArc, styles.cornerTopLeft]} />
@@ -523,21 +509,15 @@ export default function DreamTeamScreen({ userId }) {
           {selectedPlayers.length === 0 && (
             <View style={styles.pitchEmpty}>
               <Text style={styles.pitchEmptyText}>
-                Belum ada pemain di lapangan. Cari pemain lalu pilih dari modal.
+                Belum ada pemain. Cari & pilih pemain.
               </Text>
             </View>
           )}
         </View>
+
         {loading && (
           <View style={styles.center}>
             <ActivityIndicator color="#fbbf24" />
-            <Text style={styles.loadingText}>Memuat data pemain awal...</Text>
-          </View>
-        )}
-
-        {!!error && (
-          <View style={styles.center}>
-            <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
 
@@ -545,7 +525,7 @@ export default function DreamTeamScreen({ userId }) {
           <Text style={styles.searchError}>{searchError}</Text>
         )}
 
-        {/* Footer ala FPL: status + save + search di bawah (hanya footer yang naik) */}
+        {/* Footer */}
         <View
           style={[
             styles.footerKAV,
@@ -560,27 +540,13 @@ export default function DreamTeamScreen({ userId }) {
                 <View style={styles.summaryBlock}>
                   <Text style={styles.summaryLabel}>Terpilih</Text>
                   <Text style={styles.summaryValue}>
-                    {selectedPlayers.length}
-                    <Text style={styles.summaryValueMuted}>
-                      {" "}
-                      / {MAX_PLAYERS}
-                    </Text>
+                    {selectedPlayers.length} / {MAX_PLAYERS}
                   </Text>
                 </View>
                 <View style={styles.summaryBlock}>
                   <Text style={styles.summaryLabel}>Budget</Text>
                   <Text style={styles.summaryBudget}>
-                    £{totalSpent.toFixed(1)}m
-                    <Text style={styles.summaryValueMuted}>
-                      {" "}
-                      / £{TOTAL_BUDGET.toFixed(1)}m
-                    </Text>
-                  </Text>
-                </View>
-                <View style={styles.summaryBlock}>
-                  <Text style={styles.summaryLabel}>Rating</Text>
-                  <Text style={styles.summaryValue}>
-                    {avgRating.toFixed(1)}
+                    £{totalSpent.toFixed(1)}m / £{TOTAL_BUDGET.toFixed(1)}m
                   </Text>
                 </View>
               </View>
@@ -588,43 +554,33 @@ export default function DreamTeamScreen({ userId }) {
               <View style={styles.summaryActions}>
                 <TouchableOpacity
                   style={styles.playButton}
-                  activeOpacity={0.85}
                   onPress={handlePlayVsBot}
                 >
                   <MaterialIcons
                     name="sports-soccer"
-                    size={16}
+                    size={20}
                     color="#e5e7eb"
-                    style={{ marginRight: 4 }}
+                    style={{ marginRight: 6 }}
                   />
-                  <Text style={styles.playButtonText}>Play vs Bot</Text>
+                  <Text style={styles.playButtonText}>Play</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[
-                    styles.saveButton,
-                    (!userId || !selectedPlayers.length || saving) &&
-                      styles.saveButtonDisabled,
-                  ]}
-                  activeOpacity={0.85}
+                  style={[styles.saveButton, (!userId || !selectedPlayers.length || saving) && styles.saveButtonDisabled]}
                   onPress={handleSaveToFirebase}
                   disabled={!userId || !selectedPlayers.length || saving}
                 >
                   <MaterialIcons
                     name="save"
-                    size={16}
+                    size={20}
                     color="#111827"
-                    style={{ marginRight: 4 }}
+                    style={{ marginRight: 6 }}
                   />
                   <Text style={styles.saveButtonText}>
-                    {saving ? "Menyimpan..." : "Simpan"}
+                    {saving ? "..." : "Simpan"}
                   </Text>
                 </TouchableOpacity>
               </View>
             </View>
-
-            {!!saveStatus && (
-              <Text style={styles.saveStatusText}>{saveStatus}</Text>
-            )}
 
             <View style={styles.footerSearchRow}>
               <View style={styles.searchWrapper}>
@@ -636,7 +592,7 @@ export default function DreamTeamScreen({ userId }) {
                 />
                 <TextInput
                   style={styles.searchInput}
-                  placeholder="Cari pemain (mis. Haaland)..."
+                  placeholder="Cari pemain..."
                   placeholderTextColor="#6b7280"
                   value={query}
                   onChangeText={setQuery}
@@ -645,12 +601,9 @@ export default function DreamTeamScreen({ userId }) {
                 {query.trim().length > 0 && (
                   <TouchableOpacity
                     style={styles.inlineSearchButton}
-                    activeOpacity={0.85}
                     onPress={handleGlobalSearch}
                   >
-                    <Text style={styles.inlineSearchButtonText}>
-                      {searching ? "Cari..." : "Cari"}
-                    </Text>
+                    <Text style={styles.inlineSearchButtonText}>Cari</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -672,7 +625,6 @@ export default function DreamTeamScreen({ userId }) {
                   <TouchableOpacity
                     key={item.id}
                     style={styles.modalRow}
-                    activeOpacity={0.85}
                     onPress={() => handleChooseFromResults(item)}
                   >
                     <View style={styles.modalRowMain}>
@@ -680,7 +632,7 @@ export default function DreamTeamScreen({ userId }) {
                         {item.name}
                       </Text>
                       <Text style={styles.playerMeta} numberOfLines={1}>
-                        {item.team || "-"} • {item.position || "?"}
+                        {item.team} • {item.position}
                       </Text>
                     </View>
                     <View style={styles.ratingBadge}>
@@ -690,15 +642,9 @@ export default function DreamTeamScreen({ userId }) {
                     </View>
                   </TouchableOpacity>
                 ))}
-                {searchResults.length === 0 && (
-                  <Text style={styles.errorText}>
-                    Tidak ada hasil. Coba kata kunci lain.
-                  </Text>
-                )}
               </ScrollView>
               <TouchableOpacity
                 style={styles.modalCloseButton}
-                activeOpacity={0.85}
                 onPress={() => setShowResultsModal(false)}
               >
                 <Text style={styles.modalCloseText}>Tutup</Text>
@@ -718,54 +664,65 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     width: "100%",
-    paddingHorizontal: 8,
+    // Apply negative margins to break out of App.js paddingHorizontal: 24
+    marginHorizontal: -24,
+    // We add paddingHorizontal: 24 to specific children (title, footer) instead.
     paddingTop: 8,
-    paddingBottom: 120,
+    paddingBottom: 170, // Increased bottom padding to accommodate taller footer
   },
   title: {
     fontSize: 18,
     fontWeight: "700",
     color: "#e5e7eb",
+    paddingHorizontal: 24, // Restored padding
+    marginTop: 8,
   },
   subtitle: {
     marginTop: 4,
     fontSize: 12,
     color: "#9ca3af",
+    paddingHorizontal: 24, // Restored padding
+    marginBottom: 8,
   },
   footerKAV: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
+    paddingBottom: 20, // Add some safe area padding at bottom
   },
   footer: {
     backgroundColor: "#020617",
     borderTopWidth: 1,
     borderColor: "#1f2937",
-    paddingTop: 6,
+    paddingTop: 8,
     paddingBottom: 8,
   },
   summaryCard: {
     backgroundColor: "rgba(15,23,42,0.98)",
     borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    paddingVertical: 12, // Increased vertical padding
+    paddingHorizontal: 16,
+    marginHorizontal: 16, // Keep card floating
+    flexDirection: "column", // CHANGED TO COLUMN
+    alignItems: "flex-start", // Left align stats
     borderWidth: 1,
     borderColor: "rgba(55,65,81,0.8)",
   },
   summaryBlocks: {
     flexDirection: "row",
-    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    marginBottom: 12, // Gap between Stats and Buttons
   },
   summaryBlock: {
-    marginRight: 16,
+    // No right margin needed due to space-between
   },
   summaryActions: {
-    flexDirection: "column",
-    alignItems: "flex-end",
+    flexDirection: "row", // Side-by-side buttons
+    alignItems: "center",
+    width: "100%",
+    gap: 12, // Gap between buttons
   },
   summaryLabel: {
     fontSize: 10,
@@ -774,12 +731,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.8,
   },
-  summaryText: {
-    fontSize: 12,
-    color: "#e5e7eb",
-  },
   summaryValue: {
-    fontSize: 13,
+    fontSize: 14, // Slightly larger
     fontWeight: "700",
     color: "#e5e7eb",
   },
@@ -789,20 +742,15 @@ const styles = StyleSheet.create({
     color: "#9ca3af",
   },
   summaryBudget: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "700",
     color: "#22c55e",
   },
-  saveStatusText: {
-    marginTop: 6,
-    marginLeft: 12,
-    fontSize: 11,
-    color: "#9ca3af",
-  },
   saveButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
+    flex: 1, // Full Width
+    justifyContent: "center",
+    paddingVertical: 12, // Taller button
+    borderRadius: 8,
     backgroundColor: "#fbbf24",
     flexDirection: "row",
     alignItems: "center",
@@ -811,35 +759,34 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   saveButtonText: {
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 14, // Larger font
+    fontWeight: "700",
     color: "#111827",
   },
   playButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginBottom: 4,
-    borderRadius: 999,
+    flex: 1, // Full Width
+    justifyContent: "center",
+    paddingVertical: 12, // Taller button
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: "#4b5563",
+    backgroundColor: "#1f2937",
     flexDirection: "row",
     alignItems: "center",
-    marginRight: 4,
   },
   playButtonText: {
-    fontSize: 11,
-    fontWeight: "600",
+    fontSize: 14, // Larger font
+    fontWeight: "700",
     color: "#e5e7eb",
   },
   pitch: {
-    marginTop: 12,
-    borderRadius: 16,
+    marginTop: 0,
+    borderRadius: 0,
     borderWidth: 0,
     borderColor: "transparent",
     backgroundColor: "#022c22",
     paddingVertical: 10,
-    paddingHorizontal: 8,
-    height: 450,
+    flex: 1,
     position: "relative",
     overflow: "hidden",
   },
@@ -916,12 +863,12 @@ const styles = StyleSheet.create({
   },
   penaltyBoxOuterTop: {
     left: "50%",
-    borderColor: "rgba(255,255,255,0.7)",
+    borderColor: "rgba(255,255,255,0.3)", // Faded
     marginLeft: "-32.5%",
     top: 6,
-    borderBottomWidth: 2,
-    borderLeftWidth: 2,
-    borderRightWidth: 2,
+    borderBottomWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
   },
   penaltyBoxOuterBottom: {
     left: "50%",
@@ -929,17 +876,17 @@ const styles = StyleSheet.create({
     bottom: 6,
     borderTopWidth: 2,
     borderLeftWidth: 2,
-    borderColor: "rgba(255,255,255,0.7)",
-
+    borderColor: "#fff", // Bold
     borderRightWidth: 2,
   },
   penaltyBoxInnerTop: {
     left: "50%",
     marginLeft: "-13%",
     top: 12,
-    borderBottomWidth: 2,
-    borderLeftWidth: 2,
-    borderRightWidth: 2,
+    borderBottomWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)", // Faded
   },
   penaltyBoxInnerBottom: {
     left: "50%",
@@ -948,6 +895,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 2,
     borderLeftWidth: 2,
     borderRightWidth: 2,
+    borderColor: "#fff", // Bold
   },
   penaltySpot: {
     position: "absolute",
@@ -957,9 +905,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.9)",
     left: "50%",
     marginLeft: -3,
-  },
-  penaltySpotTop: {
-    top: "10%",
   },
   penaltySpotBottom: {
     bottom: "10%",
@@ -975,13 +920,15 @@ const styles = StyleSheet.create({
     left: "50%",
     marginLeft: -35,
     top: "15%",
-    borderBottomWidth: 2,
+    borderBottomWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)", // Faded
   },
   penaltyArcBottom: {
     left: "50%",
     marginLeft: -35,
     bottom: "15%",
     borderTopWidth: 2,
+    borderColor: "#fff", // Bold
   },
   goalArea: {
     position: "absolute",
@@ -992,15 +939,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.8)",
     backgroundColor: "rgba(255,255,255,0.15)",
   },
-  goalTop: {
-    top: -2,
-    borderTopWidth: 2,
-    borderLeftWidth: 2,
-    borderRightWidth: 2,
-    borderBottomWidth: 0,
-    borderTopLeftRadius: 2,
-    borderTopRightRadius: 2,
-  },
   goalBottom: {
     bottom: -2,
     borderBottomWidth: 2,
@@ -1009,6 +947,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 0,
     borderBottomLeftRadius: 2,
     borderBottomRightRadius: 2,
+  },
+  goalNetPattern: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.3)',
   },
   cornerArc: {
     position: "absolute",
@@ -1043,28 +985,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: 2,
     borderTopWidth: 2,
     borderTopLeftRadius: 16,
-  },
-  goalLine: {
-    position: "absolute",
-    left: "13%",
-    right: "12%",
-    borderTopWidth: 2,
-    borderColor: "#16a34a",
-  },
-  goalLineTop: {
-    top: 8,
-  },
-  goalLineBottom: {
-    bottom: 8,
-  },
-  centerLine: {
-    position: "absolute",
-    left: "12%",
-    right: "12%",
-    top: "50%",
-    borderTopWidth: 1,
-    borderColor: "#16a34a",
-    opacity: 0.7,
   },
   slot: {
     alignItems: "center",
@@ -1157,7 +1077,7 @@ const styles = StyleSheet.create({
   },
   footerSearchRow: {
     marginTop: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16, // Matched padding
     paddingTop: 6,
   },
   searchWrapper: {
@@ -1258,5 +1178,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: "#e5e7eb",
+  },
+  myGoalLabelContainer: {
+    position: 'absolute',
+    bottom: 60,
+    left: 0, right: 0,
+    alignItems: 'center',
+    opacity: 0.6,
+  },
+  myGoalLabel: {
+    color: '#fbbf24',
+    fontWeight: '900',
+    fontSize: 14,
+    marginTop: 4,
+    textShadowColor: 'black',
+    textShadowRadius: 4,
+  },
+  probedLabelContainer: {
+    position: 'absolute',
+    top: 100,
+    left: 0, right: 0,
+    alignItems: 'center',
+    opacity: 0.3,
+  },
+  probedLabel: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 10,
+    marginBottom: 2,
   },
 });
