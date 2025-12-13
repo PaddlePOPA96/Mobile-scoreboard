@@ -18,7 +18,9 @@ import {
 } from "../../hooks/useFootballDataMobile";
 import { resolveClubLogoNative } from "../../lib/logoNative";
 import LiveMatchCard from "../UI/LiveMatchCard";
+
 import MatchCard from "../UI/MatchCard";
+import TodayMatchCard from "../UI/TodayMatchCard";
 import TabNavigation from "../UI/TabNavigation";
 
 export default function PremierLeagueScreen() {
@@ -285,61 +287,48 @@ export default function PremierLeagueScreen() {
     <View style={styles.container}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         {/* Live Now Section - Always show if there are live matches */}
-        {liveMatches.length > 0 && (
+        {/* Live Now Section - REMOVED/MERGED into Hari Ini */}
+        {/* {liveMatches.length > 0 && (
           <View style={styles.liveSection}>
-            <View style={styles.liveSectionHeader}>
-              <Text style={styles.liveNowTitle}>Live Now</Text>
-              <TouchableOpacity>
-                <Text style={styles.seeMore}>See More</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.liveMatchesScroll}
-            >
-              {liveMatches.map((match) => {
-                const matchData = prepareMatchData(match);
-                return (
-                  <LiveMatchCard
-                    key={match.id}
-                    homeTeam={matchData.homeTeam}
-                    awayTeam={matchData.awayTeam}
-                    status={match.minute ? `${match.minute}'` : "LIVE"}
-                    onPress={() => { }}
-                  />
-                );
-              })}
-            </ScrollView>
+             ...
           </View>
-        )}
+        )} */}
 
         {/* Today's Matches - Global Section */}
-        {groupedUpcoming.today.length > 0 && (
-          <View style={styles.todaySection}>
-            <Text style={[styles.dateSectionTitle, { paddingHorizontal: 16 }]}>Hari Ini</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 16 }} // Add padding so rounded corners are visible
-            >
-              {groupedUpcoming.today.map((match) => {
-                const matchData = prepareMatchData(match);
-                return (
-                  <View key={match.id} style={{ width: 320, marginRight: 12 }}>
-                    <MatchCard
-                      date={formatTime(match)}
-                      homeTeam={matchData.homeTeam}
-                      awayTeam={matchData.awayTeam}
-                      status="scheduled"
-                    />
-                  </View>
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
+        {/* Today's Matches - Global Section (Live + Scheduled) */}
+        {(() => {
+          const todaysMatches = [...liveMatches, ...groupedUpcoming.today];
+
+          if (todaysMatches.length === 0) return null;
+
+          return (
+            <View style={styles.todaySection}>
+              <Text style={[styles.dateSectionTitle, { paddingHorizontal: 16 }]}>Hari Ini</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16 }}
+              >
+                {todaysMatches.map((match) => {
+                  const matchData = prepareMatchData(match);
+                  const isLive = match.status === "IN_PLAY" || match.status === "PAUSED";
+                  return (
+                    <View key={match.id} style={{ width: 320, marginRight: 12 }}>
+                      <TodayMatchCard
+                        date={formatTime(match)}
+                        homeTeam={matchData.homeTeam}
+                        awayTeam={matchData.awayTeam}
+                        homeScore={isLive ? matchData.homeTeam.score : (matchData.homeTeam.score ?? 0)}
+                        awayScore={isLive ? matchData.awayTeam.score : (matchData.awayTeam.score ?? 0)}
+                        status={match.status}
+                      />
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          );
+        })()}
 
         {/* Tab Navigation */}
         <View style={styles.tabSection}>

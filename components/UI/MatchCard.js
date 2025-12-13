@@ -44,8 +44,8 @@ export default function MatchCard({
                 {awayScore}
               </Text>
             </View>
-            <Text style={styles.statusText}>
-              {isLive ? "● LIVE" : "FT"}
+            <Text style={[styles.statusText, !isLive && status !== "FINISHED" && { color: "#9ca3af" }]}>
+              {isLive ? "● LIVE" : status === "FINISHED" ? "FT" : date}
             </Text>
           </>
         ) : (
