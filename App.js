@@ -20,13 +20,13 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "./auth";
-import OverlayLayoutMobile from "./components/OverlayLayoutMobile";
-import PremierLeagueScreen from "./components/PremierLeagueScreen";
-import ChampionsLeagueScreen from "./components/ChampionsLeagueScreen";
-import PrimaryButton from "./components/PrimaryButton";
-import SecondaryButton from "./components/SecondaryButton";
-import NavItem from "./components/NavItem";
-import DreamTeamScreen from "./components/DreamTeamScreen";
+import OverlayLayoutMobile from "./components/pages/OverlayLayoutMobile";
+import PremierLeagueScreen from "./components/pages/PremierLeagueScreen";
+import ChampionsLeagueScreen from "./components/pages/ChampionsLeagueScreen";
+import PrimaryButton from "./components/UI/PrimaryButton";
+import SecondaryButton from "./components/UI/SecondaryButton";
+import NavItem from "./components/UI/NavItem";
+import DreamTeamScreen from "./components/pages/DreamTeamScreen";
 
 const CREDENTIALS_KEY = "scoreboard_mobile_credentials";
 
@@ -36,8 +36,8 @@ export default function App() {
   const [password, setPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
-   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-   const [manualMinutes, setManualMinutes] = useState("");
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [manualMinutes, setManualMinutes] = useState("");
   const [status, setStatus] = useState({ type: "", message: "" });
   const [activeTab, setActiveTab] = useState("scoreboard"); // "scoreboard" | "premier-league" | "ucl-table" | "dream-team"
 
@@ -399,8 +399,8 @@ export default function App() {
                   style={[
                     styles.periodButton,
                     data.period !== 1 &&
-                      data.period !== 2 &&
-                      styles.periodButtonActive,
+                    data.period !== 2 &&
+                    styles.periodButtonActive,
                   ]}
                   onPress={() => handleSetPeriod(3)}
                 >
@@ -408,8 +408,8 @@ export default function App() {
                     style={[
                       styles.periodText,
                       data.period !== 1 &&
-                        data.period !== 2 &&
-                        styles.periodTextActive,
+                      data.period !== 2 &&
+                      styles.periodTextActive,
                     ]}
                   >
                     Extra

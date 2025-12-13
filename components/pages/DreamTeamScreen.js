@@ -15,9 +15,9 @@ import {
   Keyboard,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { fetchPlayerRatings } from "../lib/dreamTeamApi";
-import { db } from "../firebase";
-import { onValue, ref, set } from "firebase/database";
+import { fetchPlayerRatings } from "../../lib/dreamTeamApi";
+import { db } from "../../firebase";
+import { onValue, ref, set, get } from "firebase/database";
 import DreamTeamMatchScreen from "./DreamTeamMatchScreen";
 
 const MAX_PLAYERS = 15; // batas skuad (maksimal pemain yang bisa dipilih)
@@ -188,6 +188,10 @@ export default function DreamTeamScreen({ userId }) {
   const [saving, setSaving] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [mode, setMode] = useState("builder");
+  const [teamName, setTeamName] = useState("My Dream Team");
+  const [showOpponentModal, setShowOpponentModal] = useState(false);
+  const [availableOpponents, setAvailableOpponents] = useState([]);
+  const [selectedOpponent, setSelectedOpponent] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -234,12 +238,76 @@ export default function DreamTeamScreen({ userId }) {
     const dreamRef = ref(db, `dream_team/${userId}`);
     const unsubscribe = onValue(dreamRef, (snapshot) => {
       if (!snapshot.exists()) {
+        console.log('[DreamTeam] No saved data found in Firebase');
         setSaveStatus("Belum pernah disimpan");
         return;
       }
       const val = snapshot.val() || {};
-      const savedLineup = Array.isArray(val.lineup) ? val.lineup : [];
-      const savedPlayers = Array.isArray(val.players) ? val.players : [];
+
+      // Support both old format (numeric keys) and new format (lineup/players arrays)
+      let savedLineup = [];
+      let savedPlayers = [];
+
+      if (Array.isArray(val.lineup) && Array.isArray(val.players)) {
+        // New format
+        savedLineup = val.lineup;
+        savedPlayers = val.players;
+        console.log('[DreamTeam] Loaded NEW format from Firebase');
+      } else {
+        // Old format: convert numeric keys to arrays
+        const entries = Object.entries(val).filter(([key]) => !isNaN(key));
+        if (entries.length > 0) {
+          savedPlayers = entries.map(([_, player]) => player);
+          savedLineup = savedPlayers.map(p => ({ id: p.id, x: p.x, y: p.y }));
+          console.log('[DreamTeam] Loaded OLD format from Firebase, converted to new format');
+        }
+      }
+
+      // CRITICAL FIX: Normalize coordinates if they are in pixel values (> 1)
+      // Old data stored coordinates in pixels, new format uses 0-1 range
+      savedLineup = savedLineup.map(slot => {
+        let normalizedX = slot.x;
+        let normalizedY = slot.y;
+
+        // If coordinates are > 1, they are in pixels and need normalization
+        // Assume pitch was ~300px wide and ~450px tall (typical mobile dimensions)
+        if (normalizedX > 1) {
+          normalizedX = normalizedX / 100; // Convert from percentage-like to 0-1
+        }
+        if (normalizedY > 1) {
+          normalizedY = normalizedY / 100; // Convert from percentage-like to 0-1
+        }
+
+        // Clamp to valid range
+        normalizedX = Math.max(0.05, Math.min(0.95, normalizedX));
+        normalizedY = Math.max(0.05, Math.min(0.95, normalizedY));
+
+        return { ...slot, x: normalizedX, y: normalizedY };
+      });
+
+      savedPlayers = savedPlayers.map(player => {
+        let normalizedX = player.x;
+        let normalizedY = player.y;
+
+        if (normalizedX > 1) {
+          normalizedX = normalizedX / 100;
+        }
+        if (normalizedY > 1) {
+          normalizedY = normalizedY / 100;
+        }
+
+        normalizedX = Math.max(0.05, Math.min(0.95, normalizedX));
+        normalizedY = Math.max(0.05, Math.min(0.95, normalizedY));
+
+        return { ...player, x: normalizedX, y: normalizedY };
+      });
+
+      // console.log('[DreamTeam] Loaded from Firebase:', {
+      //   lineupCount: savedLineup.length,
+      //   playersCount: savedPlayers.length,
+      //   lineup: savedLineup,
+      //   players: savedPlayers
+      // });
 
       if (savedLineup.length) {
         setLineup(savedLineup);
@@ -253,8 +321,14 @@ export default function DreamTeamScreen({ userId }) {
               map.set(p.id, withPrice(merged));
             }
           });
-          return Array.from(map.values());
+          const result = Array.from(map.values());
+          console.log('[DreamTeam] Updated players state:', result.length);
+          return result;
         });
+      }
+      // Load team name if exists
+      if (val.teamName) {
+        setTeamName(val.teamName);
       }
       setSaveStatus("Tersimpan dari cloud");
     });
@@ -286,6 +360,15 @@ export default function DreamTeamScreen({ userId }) {
     })
     .filter(Boolean);
 
+  // console.log('[DreamTeam] selectedPlayers:', {
+  //   lineupLength: lineup.length,
+  //   playersLength: players.length,
+  //   selectedPlayersLength: selectedPlayers.length,
+  //   lineup: lineup.map(s => s.id),
+  //   playerIds: players.map(p => p.id).slice(0, 5),
+  //   selectedPlayers: selectedPlayers.map(p => ({ id: p.id, name: p.name, x: p.x, y: p.y }))
+  // });
+
   const avgRating =
     selectedPlayers.length === 0
       ? 0
@@ -303,6 +386,7 @@ export default function DreamTeamScreen({ userId }) {
       setSaving(true);
       setSaveStatus("Menyimpan...");
       const payload = {
+        teamName,
         lineup,
         players: selectedPlayers,
         updatedAt: Date.now(),
@@ -421,11 +505,63 @@ export default function DreamTeamScreen({ userId }) {
     setLineup((prev) => prev.filter((slot) => slot.id !== id));
   };
 
-  const handlePlayVsBot = () => {
+  const fetchOpponents = async () => {
+    if (!userId) return;
+    try {
+      const teamsRef = ref(db, 'dream_team');
+      const snapshot = await get(teamsRef);
+
+      if (!snapshot.exists()) {
+        setAvailableOpponents([]);
+        return;
+      }
+
+      const allTeams = snapshot.val();
+      const opponents = [];
+
+      Object.entries(allTeams).forEach(([uid, teamData]) => {
+        // Skip current user and teams without players
+        if (uid === userId || !teamData.players || !Array.isArray(teamData.players) || teamData.players.length === 0) {
+          return;
+        }
+
+        opponents.push({
+          userId: uid,
+          teamName: teamData.teamName || "Unknown Team",
+          players: teamData.players,
+          lineup: teamData.lineup || [],
+          updatedAt: teamData.updatedAt || 0,
+        });
+      });
+
+      // Sort by most recently updated
+      opponents.sort((a, b) => b.updatedAt - a.updatedAt);
+      setAvailableOpponents(opponents);
+      console.log('[DreamTeam] Found opponents:', opponents.length);
+    } catch (error) {
+      console.error('[DreamTeam] Error fetching opponents:', error);
+      setAvailableOpponents([]);
+    }
+  };
+
+  const handleOpenOpponentModal = async () => {
     if (!selectedPlayers.length) {
       setSearchError("Pilih pemain dulu sebelum melawan bot.");
       return;
     }
+    await fetchOpponents();
+    setShowOpponentModal(true);
+  };
+
+  const handleSelectOpponent = (opponent) => {
+    setSelectedOpponent(opponent);
+    setShowOpponentModal(false);
+    setMode("match");
+  };
+
+  const handlePlayVsBot = () => {
+    setSelectedOpponent(null); // null means play vs bot
+    setShowOpponentModal(false);
     setMode("match");
   };
 
@@ -433,6 +569,9 @@ export default function DreamTeamScreen({ userId }) {
     return (
       <DreamTeamMatchScreen
         userTeam={selectedPlayers}
+        userTeamName={teamName}
+        opponentTeam={selectedOpponent}
+        opponentTeamName={selectedOpponent?.teamName || "All Stars"}
         onBack={() => setMode("builder")}
       />
     );
@@ -445,6 +584,19 @@ export default function DreamTeamScreen({ userId }) {
         <Text style={styles.subtitle}>
           Pilih sampai 15 pemain. Drag utk atur posisi.
         </Text>
+
+        {/* Team Name Input */}
+        <View style={styles.teamNameContainer}>
+          <MaterialIcons name="sports-soccer" size={16} color="#fbbf24" style={{ marginRight: 8 }} />
+          <TextInput
+            style={styles.teamNameInput}
+            value={teamName}
+            onChangeText={setTeamName}
+            placeholder="Nama Tim Anda"
+            placeholderTextColor="#6b7280"
+            maxLength={30}
+          />
+        </View>
 
         <View
           style={styles.pitch}
@@ -554,7 +706,7 @@ export default function DreamTeamScreen({ userId }) {
               <View style={styles.summaryActions}>
                 <TouchableOpacity
                   style={styles.playButton}
-                  onPress={handlePlayVsBot}
+                  onPress={handleOpenOpponentModal}
                 >
                   <MaterialIcons
                     name="sports-soccer"
@@ -652,6 +804,73 @@ export default function DreamTeamScreen({ userId }) {
             </View>
           </View>
         </Modal>
+
+        {/* Opponent Selection Modal */}
+        <Modal
+          visible={showOpponentModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowOpponentModal(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Pilih Lawan</Text>
+
+              {/* Bot Option */}
+              <TouchableOpacity
+                style={[styles.opponentRow, styles.botRow]}
+                onPress={handlePlayVsBot}
+              >
+                <View style={styles.opponentIcon}>
+                  <MaterialIcons name="smart-toy" size={24} color="#fbbf24" />
+                </View>
+                <View style={styles.opponentInfo}>
+                  <Text style={styles.opponentName}>🤖 Bot (All Stars)</Text>
+                  <Text style={styles.opponentMeta}>Lawan komputer</Text>
+                </View>
+                <MaterialIcons name="chevron-right" size={24} color="#6b7280" />
+              </TouchableOpacity>
+
+              <View style={styles.divider} />
+
+              {/* Player Teams */}
+              <ScrollView style={styles.modalList}>
+                {availableOpponents.length === 0 ? (
+                  <Text style={styles.noOpponents}>
+                    Belum ada pemain lain yang tersedia.{'\n'}
+                    Mainkan vs Bot dulu!
+                  </Text>
+                ) : (
+                  availableOpponents.map((opp) => (
+                    <TouchableOpacity
+                      key={opp.userId}
+                      style={styles.opponentRow}
+                      onPress={() => handleSelectOpponent(opp)}
+                    >
+                      <View style={styles.opponentIcon}>
+                        <MaterialIcons name="person" size={24} color="#3b82f6" />
+                      </View>
+                      <View style={styles.opponentInfo}>
+                        <Text style={styles.opponentName}>{opp.teamName}</Text>
+                        <Text style={styles.opponentMeta}>
+                          {opp.players.length} pemain
+                        </Text>
+                      </View>
+                      <MaterialIcons name="chevron-right" size={24} color="#6b7280" />
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowOpponentModal(false)}
+              >
+                <Text style={styles.modalCloseText}>Batal</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </View>
     </View>
   );
@@ -683,6 +902,24 @@ const styles = StyleSheet.create({
     color: "#9ca3af",
     paddingHorizontal: 24, // Restored padding
     marginBottom: 8,
+  },
+  teamNameContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#111827",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginHorizontal: 24,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#374151",
+  },
+  teamNameInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#e5e7eb",
+    fontWeight: "600",
   },
   footerKAV: {
     position: "absolute",
@@ -1178,6 +1415,53 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: "#e5e7eb",
+  },
+  opponentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    backgroundColor: "#1f2937",
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  botRow: {
+    backgroundColor: "#374151",
+    borderWidth: 1,
+    borderColor: "#fbbf24",
+  },
+  opponentIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#111827",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  opponentInfo: {
+    flex: 1,
+  },
+  opponentName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#e5e7eb",
+    marginBottom: 2,
+  },
+  opponentMeta: {
+    fontSize: 12,
+    color: "#9ca3af",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#374151",
+    marginVertical: 12,
+  },
+  noOpponents: {
+    fontSize: 13,
+    color: "#9ca3af",
+    textAlign: "center",
+    paddingVertical: 24,
+    lineHeight: 20,
   },
   myGoalLabelContainer: {
     position: 'absolute',

@@ -15,7 +15,7 @@ import {
   Modal,
 } from "react-native";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
-import { getFallbackPlayerRatings } from "../lib/dreamTeamApi";
+import { getFallbackPlayerRatings } from "../../lib/dreamTeamApi";
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -343,7 +343,13 @@ const Pitch = ({ ball, homePlayers, awayPlayers }) => {
   );
 };
 
-export default function DreamTeamMatchScreen({ userTeam, onBack }) {
+export default function DreamTeamMatchScreen({
+  userTeam,
+  userTeamName = "Dream Team",
+  opponentTeam = null,
+  opponentTeamName = "All Stars",
+  onBack
+}) {
   const [phase, setPhase] = useState("pre");
   const [simData, setSimData] = useState(null);
 
@@ -355,8 +361,22 @@ export default function DreamTeamMatchScreen({ userTeam, onBack }) {
   const [lastEventText, setLastEventText] = useState("");
   const [goalAnim, setGoalAnim] = useState(null);
 
-  const homeTeam = useMemo(() => normalizeTeam(userTeam, "Dream Team"), [userTeam]);
-  const awayTeam = useMemo(() => normalizeTeam(getFallbackPlayerRatings(35), "All Stars"), []);
+  const homeTeam = useMemo(() => normalizeTeam(userTeam, userTeamName), [userTeam, userTeamName]);
+
+  // If opponent team is provided, mirror their positions for away team
+  const awayTeam = useMemo(() => {
+    if (opponentTeam && opponentTeam.players) {
+      // Mirror opponent positions: invert x and y coordinates
+      const mirroredPlayers = opponentTeam.players.map(p => ({
+        ...p,
+        x: 1 - p.x,  // Mirror horizontally
+        y: 1 - p.y   // Mirror vertically
+      }));
+      return normalizeTeam(mirroredPlayers, opponentTeamName);
+    }
+    // Fallback to bot
+    return normalizeTeam(getFallbackPlayerRatings(35), "All Stars");
+  }, [opponentTeam, opponentTeamName]);
 
   const startMatch = () => {
     const sim = simulateMatch(homeTeam, awayTeam);

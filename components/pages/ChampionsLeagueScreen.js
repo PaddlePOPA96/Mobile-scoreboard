@@ -10,8 +10,8 @@ import {
 import {
   useMobileChampionsLeagueMatches,
   useMobileChampionsLeagueStandings,
-} from "../hooks/useFootballDataMobile";
-import { resolveAnyClubLogoNative } from "../lib/logoNative";
+} from "../../hooks/useFootballDataMobile";
+import { resolveAnyClubLogoNative } from "../../lib/logoNative";
 
 export default function ChampionsLeagueScreen() {
   const { standings, loadingStandings } =
@@ -56,39 +56,39 @@ export default function ChampionsLeagueScreen() {
         {loadingMatches ? (
           <ActivityIndicator color="#fbbf24" />
         ) : (() => {
-            const liveMatches =
-              (matches || []).filter(
-                (m) => m.status === "IN_PLAY" || m.status === "PAUSED",
-              ) || [];
-            if (!liveMatches.length) {
-              return (
-                <Text style={styles.muted}>
-                  Tidak ada pertandingan yang sedang berlangsung.
-                </Text>
-              );
-            }
-            return liveMatches.map((m) => (
-              <View key={`live-${m.id}`} style={styles.liveRow}>
-                <View style={styles.liveTeamsBlock}>
-                  <View style={styles.liveTeamLine}>
-                    <Text style={styles.liveTeams} numberOfLines={1}>
-                      {m.homeTeam.shortName || m.homeTeam.name}
-                    </Text>
-                  </View>
-                  <View style={styles.liveTeamLine}>
-                    <Text style={styles.liveTeams} numberOfLines={1}>
-                      {m.awayTeam.shortName || m.awayTeam.name}
-                    </Text>
-                  </View>
-                  <Text style={styles.matchDate}>{formatDateTime(m)}</Text>
+          const liveMatches =
+            (matches || []).filter(
+              (m) => m.status === "IN_PLAY" || m.status === "PAUSED",
+            ) || [];
+          if (!liveMatches.length) {
+            return (
+              <Text style={styles.muted}>
+                Tidak ada pertandingan yang sedang berlangsung.
+              </Text>
+            );
+          }
+          return liveMatches.map((m) => (
+            <View key={`live-${m.id}`} style={styles.liveRow}>
+              <View style={styles.liveTeamsBlock}>
+                <View style={styles.liveTeamLine}>
+                  <Text style={styles.liveTeams} numberOfLines={1}>
+                    {m.homeTeam.shortName || m.homeTeam.name}
+                  </Text>
                 </View>
-                <View style={styles.liveScoreBlock}>
-                  <Text style={styles.liveStatus}>LIVE</Text>
-                  <Text style={styles.liveScore}>{formatScore(m)}</Text>
+                <View style={styles.liveTeamLine}>
+                  <Text style={styles.liveTeams} numberOfLines={1}>
+                    {m.awayTeam.shortName || m.awayTeam.name}
+                  </Text>
                 </View>
+                <Text style={styles.matchDate}>{formatDateTime(m)}</Text>
               </View>
-            ));
-          })()}
+              <View style={styles.liveScoreBlock}>
+                <Text style={styles.liveStatus}>LIVE</Text>
+                <Text style={styles.liveScore}>{formatScore(m)}</Text>
+              </View>
+            </View>
+          ));
+        })()}
       </View>
 
       <Text style={styles.sectionTitle}>Klasemen Grup</Text>
