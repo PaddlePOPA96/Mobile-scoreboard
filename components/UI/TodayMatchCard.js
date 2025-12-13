@@ -20,6 +20,26 @@ export default function TodayMatchCard({
             onPress={onPress}
             activeOpacity={0.8}
         >
+            {/* Background Logos (Blurred) */}
+            <View style={styles.backgroundContainer}>
+                {homeTeam.logo && (
+                    <Image
+                        source={homeTeam.logo}
+                        style={[styles.bgLogo, styles.bgLogoLeft]}
+                        resizeMode="cover"
+                        blurRadius={3}
+                    />
+                )}
+                {awayTeam.logo && (
+                    <Image
+                        source={awayTeam.logo}
+                        style={[styles.bgLogo, styles.bgLogoRight]}
+                        resizeMode="cover"
+                        blurRadius={3}
+                    />
+                )}
+            </View>
+
             {/* Home Team (Left) */}
             <View style={styles.teamSection}>
                 {homeTeam.logo && (
@@ -71,16 +91,45 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         backgroundColor: "#1f2937",
         borderRadius: 16,
-        height: 110, // Taller card as requested
+        height: 110,
         width: "100%",
+        overflow: "hidden", // Clip background images
+        position: "relative",
+    },
+    backgroundContainer: {
+        ...StyleSheet.absoluteFillObject,
+        flexDirection: "row", // Still row, but children are absolute now
+        zIndex: -1,
+    },
+    backgroundContainer: {
+        ...StyleSheet.absoluteFillObject,
+        flexDirection: "row",
+        zIndex: -1,
+    },
+    bgLogo: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        width: "100%", // Full width to eliminate vertical edges
+        height: "100%",
+        opacity: 0.1, // Slightly lower opacity since they overlap
+    },
+    bgLogoLeft: {
+        transform: [{ scale: 1.6 }, { translateX: -40 }], // Shift content left
+    },
+    bgLogoRight: {
+        transform: [{ scale: 1.6 }, { translateX: 40 }], // Shift content right
     },
     teamSection: {
         flex: 1,
         alignItems: "center",
         justifyContent: "center",
+        zIndex: 1, // On top of background
     },
     teamLogo: {
-        width: 48, // Larger logo
+        width: 48,
         height: 48,
         marginBottom: 8,
     },
@@ -95,6 +144,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
         width: 100,
+        zIndex: 1,
     },
     scoreContainer: {
         flexDirection: "row",
@@ -102,12 +152,12 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     scoreText: {
-        fontSize: 28, // Prominent score
+        fontSize: 28,
         fontWeight: "800",
         color: "#e5e7eb",
     },
     liveScoreText: {
-        color: "#10b981", // Green for live
+        color: "#10b981",
     },
     scoreSeparator: {
         fontSize: 24,
@@ -120,7 +170,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 8,
-        backgroundColor: "rgba(0,0,0,0.2)",
+        backgroundColor: "rgba(0,0,0,0.4)", // Darker for readability over bg
     },
     statusText: {
         fontSize: 11,
